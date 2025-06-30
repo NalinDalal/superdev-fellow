@@ -3,28 +3,56 @@ use base64;
 use serde::Deserialize;
 use serde_json::json;
 use solana_sdk::pubkey::Pubkey;
-use spl_token::instruction::initialize_mint;
+use spl_token::instruction::{initialize_mint, mint_to};
 use std::str::FromStr;
 
 #[derive(Deserialize)]
 pub struct TokenCreateRequest {
     mintAuthority: String,
     mint: String,
-    decimals: u8,
+    pub decimals: i16, // accept even invalid values for validation
 }
 
 pub async fn create_token(Json(body): Json<TokenCreateRequest>) -> Json<serde_json::Value> {
-    let mint_pubkey = Pubkey::from_str(&body.mint).unwrap();
-    let authority = Pubkey::from_str(&body.mintAuthority).unwrap();
+    // ❗ Validate decimals range first
+    if body.decimals < 0 || body.decimals > 255 {
+        return Json(json!({
+            "success": false,
+            "error": "Invalid decimals: must be between 0 and 255"
+        }));
+    }
 
-    let ix = initialize_mint(
-        &spl_token::id(),
-        &mint_pubkey,
-        &authority,
-        None,
-        body.decimals,
-    )
-    .unwrap();
+    let decimals = body.decimals as u8;
+
+    let mint_pubkey = match Pubkey::from_str(&body.mint) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid mint address"
+            }));
+        }
+    };
+
+    let authority = match Pubkey::from_str(&body.mintAuthority) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid mintAuthority address"
+            }));
+        }
+    };
+
+    let ix = match initialize_mint(&spl_token::id(), &mint_pubkey, &authority, None, decimals) {
+        Ok(ix) => ix,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to create instruction: {}", e),
+            }));
+        }
+    };
 
     let accounts = ix
         .accounts
@@ -57,15 +85,52 @@ pub struct TokenMintRequest {
 }
 
 pub async fn mint_token(Json(body): Json<TokenMintRequest>) -> Json<serde_json::Value> {
-    let ix = spl_token::instruction::mint_to(
+    let mint = match Pubkey::from_str(&body.mint) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid mint address"
+            }));
+        }
+    };
+
+    let destination = match Pubkey::from_str(&body.destination) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid destination address"
+            }));
+        }
+    };
+
+    let authority = match Pubkey::from_str(&body.authority) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid authority address"
+            }));
+        }
+    };
+
+    let ix = match mint_to(
         &spl_token::id(),
-        &Pubkey::from_str(&body.mint).unwrap(),
-        &Pubkey::from_str(&body.destination).unwrap(),
-        &Pubkey::from_str(&body.authority).unwrap(),
+        &mint,
+        &destination,
+        &authority,
         &[],
         body.amount,
-    )
-    .unwrap();
+    ) {
+        Ok(ix) => ix,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to create instruction: {}", e)
+            }));
+        }
+    };
 
     let accounts = ix
         .accounts
