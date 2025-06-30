@@ -1,10 +1,12 @@
-use axum::{Router, routing::post};
+use axum::{Router, routing::post, serve};
 use handlers::{
     keypair::generate_keypair,
     message::{sign_message, verify_message},
     send::{send_sol, send_token},
     token::{create_token, mint_token},
 };
+use std::net::SocketAddr;
+
 use tower_http::cors::CorsLayer;
 
 mod handlers;
@@ -22,9 +24,12 @@ async fn main() {
         .route("/send/token", post(send_token))
         .layer(CorsLayer::permissive());
 
-    println!("Server running at http://localhost:3000");
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
-        .serve(app.into_make_service())
+    // Listen on port 3000
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
-        .unwrap();
+        .expect("Failed to bind to address");
+
+    let addr: SocketAddr = "0.0.0.0:3000".parse().unwrap();
+    println!("Server running at http://{addr}");
+    serve(listener, app).await.unwrap();
 }

@@ -1,3 +1,13 @@
+use axum::Json;
+use base64::{Engine as _, engine::general_purpose};
+use serde::Deserialize;
+use serde_json::json;
+use solana_sdk::{
+    pubkey::Pubkey,
+    signature::{Keypair, Signature, Signer},
+};
+use std::str::FromStr;
+
 #[derive(Deserialize)]
 pub struct SignRequest {
     message: String,
@@ -12,7 +22,7 @@ pub async fn sign_message(Json(body): Json<SignRequest>) -> Json<serde_json::Val
     Json(json!({
         "success": true,
         "data": {
-            "signature": base64::encode(signature),
+            "signature": general_purpose::STANDARD.encode(signature),
             "public_key": keypair.pubkey().to_string(),
             "message": body.message
         }
@@ -27,20 +37,22 @@ pub struct VerifyRequest {
 }
 
 pub async fn verify_message(Json(body): Json<VerifyRequest>) -> Json<serde_json::Value> {
-    let signature = base64::decode(body.signature).unwrap();
+    // Decode the signature from base64
+    let signature_bytes = general_purpose::STANDARD.decode(&body.signature).unwrap();
+
+    // Use TryFrom to create Signature
+    let signature = Signature::try_from(signature_bytes.as_slice()).unwrap();
+
+    // Parse the public key
     let pubkey = Pubkey::from_str(&body.pubkey).unwrap();
 
-    let verified = pubkey
-        .verify(
-            body.message.as_bytes(),
-            &solana_sdk::signature::Signature::new(&signature),
-        )
-        .is_ok();
+    // Verify the signature against the message
+    let is_valid = signature.verify(pubkey.as_ref(), body.message.as_bytes());
 
     Json(json!({
         "success": true,
         "data": {
-            "valid": verified,
+            "valid": is_valid,
             "message": body.message,
             "pubkey": body.pubkey
         }

@@ -1,3 +1,9 @@
+use axum::{Json, debug_handler};
+use serde::Deserialize;
+use serde_json::json;
+use solana_sdk::pubkey::Pubkey;
+use std::str::FromStr;
+
 #[derive(Deserialize)]
 pub struct SolTransferRequest {
     from: String,
@@ -5,6 +11,7 @@ pub struct SolTransferRequest {
     lamports: u64,
 }
 
+#[warn(deprecated)]
 pub async fn send_sol(Json(body): Json<SolTransferRequest>) -> Json<serde_json::Value> {
     let ix = solana_sdk::system_instruction::transfer(
         &Pubkey::from_str(&body.from).unwrap(),
@@ -21,6 +28,8 @@ pub async fn send_sol(Json(body): Json<SolTransferRequest>) -> Json<serde_json::
         }
     }))
 }
+
+#[derive(Deserialize)]
 pub struct TokenSendRequest {
     destination: String,
     mint: String,
@@ -28,6 +37,7 @@ pub struct TokenSendRequest {
     amount: u64,
 }
 
+#[debug_handler]
 pub async fn send_token(Json(body): Json<TokenSendRequest>) -> Json<serde_json::Value> {
     let ix = spl_token::instruction::transfer(
         &spl_token::id(),
@@ -36,7 +46,8 @@ pub async fn send_token(Json(body): Json<TokenSendRequest>) -> Json<serde_json::
         &Pubkey::from_str(&body.owner).unwrap(),
         &[],
         body.amount,
-    ).unwrap();
+    )
+    .unwrap();
 
     Json(json!({
         "success": true,
@@ -50,4 +61,3 @@ pub async fn send_token(Json(body): Json<TokenSendRequest>) -> Json<serde_json::
         }
     }))
 }
-

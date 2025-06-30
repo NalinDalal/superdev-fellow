@@ -1,12 +1,10 @@
-use axum::{Json, extract::State};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use solana_sdk::{
-    instruction::{Instruction, AccountMeta},
-    pubkey::Pubkey,
-};
-use spl_token::instruction::initialize_mint;
+use axum::Json;
 use base64;
+use serde::Deserialize;
+use serde_json::json;
+use solana_sdk::pubkey::Pubkey;
+use spl_token::instruction::initialize_mint;
+use std::str::FromStr;
 
 #[derive(Deserialize)]
 pub struct TokenCreateRequest {
@@ -25,15 +23,20 @@ pub async fn create_token(Json(body): Json<TokenCreateRequest>) -> Json<serde_js
         &authority,
         None,
         body.decimals,
-    ).unwrap();
+    )
+    .unwrap();
 
-    let accounts = ix.accounts.iter().map(|acc| {
-        json!({
-            "pubkey": acc.pubkey.to_string(),
-            "is_signer": acc.is_signer,
-            "is_writable": acc.is_writable,
+    let accounts = ix
+        .accounts
+        .iter()
+        .map(|acc| {
+            json!({
+                "pubkey": acc.pubkey.to_string(),
+                "is_signer": acc.is_signer,
+                "is_writable": acc.is_writable,
+            })
         })
-    }).collect::<Vec<_>>();
+        .collect::<Vec<_>>();
 
     Json(json!({
         "success": true,
@@ -61,15 +64,20 @@ pub async fn mint_token(Json(body): Json<TokenMintRequest>) -> Json<serde_json::
         &Pubkey::from_str(&body.authority).unwrap(),
         &[],
         body.amount,
-    ).unwrap();
+    )
+    .unwrap();
 
-    let accounts = ix.accounts.iter().map(|acc| {
-        json!({
-            "pubkey": acc.pubkey.to_string(),
-            "is_signer": acc.is_signer,
-            "is_writable": acc.is_writable,
+    let accounts = ix
+        .accounts
+        .iter()
+        .map(|acc| {
+            json!({
+                "pubkey": acc.pubkey.to_string(),
+                "is_signer": acc.is_signer,
+                "is_writable": acc.is_writable,
+            })
         })
-    }).collect::<Vec<_>>();
+        .collect::<Vec<_>>();
 
     Json(json!({
         "success": true,
@@ -80,4 +88,3 @@ pub async fn mint_token(Json(body): Json<TokenMintRequest>) -> Json<serde_json::
         }
     }))
 }
-
